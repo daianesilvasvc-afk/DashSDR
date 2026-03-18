@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard SDRs — Podium Educação</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0ede8;--border:rgba(0,0,0,0.09);
+  --text:#1a1917;--text2:#6b6a65;--text3:#9e9d98;
+  --blue:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;
+  --r:12px;--rs:8px;
+}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+.dashboard{display:block;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;}
+.topbar-left{display:flex;align-items:center;gap:14px;}
+.topbar-brand{font-size:14px;font-weight:600;}
+.period-badge{background:var(--surface2);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--text2);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.last-upd{font-size:12px;color:var(--text3);}
+.btn-sm{height:32px;padding:0 14px;font-size:12px;font-weight:500;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text);cursor:pointer;}
+.btn-sm:hover{background:var(--surface2);}
+.btn-sm.active{background:var(--text);color:white;border-color:var(--text);}
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;overflow-x:auto;}
+.tab{height:44px;padding:0 18px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--text);border-bottom-color:var(--text);}
+.content{padding:1.75rem 2rem;max-width:1280px;margin:0 auto;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:1.75rem;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:1.75rem;}
+.g21{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:1.75rem;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;}
+.card-title{font-size:13px;font-weight:600;margin-bottom:1.25rem;}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;}
+.mlabel{font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.mvalue{font-size:28px;font-weight:600;line-height:1;margin-bottom:6px;}
+.msub{font-size:12px;color:var(--text3);}
+.c-blue{color:var(--blue);}.c-green{color:var(--green);}.c-amber{color:var(--amber);}.c-red{color:var(--red);}
+.prog-bg{background:var(--surface2);border-radius:4px;height:7px;overflow:hidden;margin-top:8px;}
+.prog-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.prog-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px;}
+.sdr-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:1.75rem;}
+.sdr-meta-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem;}
+.smc-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.smc-name{font-size:13px;font-weight:600;}
+.smc-sub{font-size:11px;color:var(--text3);}
+.smc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.smc-metric{font-size:12px;color:var(--text2);}
+.smc-val{font-size:13px;font-weight:600;}
+.pct-badge{display:inline-block;border-radius:20px;font-size:11px;font-weight:600;padding:2px 8px;margin-left:6px;}
+.pok{background:#dcfce7;color:#15803d;}.pwarn{background:#fef3c7;color:#92400e;}.pbad{background:#fee2e2;color:#b91c1c;}
+.funnel-wrap{display:flex;flex-direction:column;gap:5px;}
+.funnel-row{display:flex;align-items:center;gap:8px;}
+.funnel-role{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;width:46px;flex-shrink:0;}
+.fr-sdr{color:var(--blue);}.fr-closer{color:var(--purple);}.fr-ambos{color:var(--text3);}
+.funnel-label{font-size:12px;color:var(--text2);width:220px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.funnel-bar-bg{flex:1;background:var(--surface2);border-radius:4px;height:26px;overflow:hidden;}
+.funnel-bar{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:600;color:white;min-width:24px;transition:width .5s ease;}
+.funnel-count{font-size:13px;font-weight:600;width:34px;text-align:right;flex-shrink:0;}
+.rtable{width:100%;border-collapse:collapse;}
+.rtable th{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+.rtable td{padding:11px 12px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.rtable tr:last-child td{border-bottom:none;}
+.rtable tr:hover td{background:var(--surface2);}
+.num{text-align:right !important;}
+.pos{font-size:12px;font-weight:700;color:var(--text3);}
+.pos.gold{color:#d97706;}.pos.silver{color:#6b7280;}.pos.bronze{color:#92400e;}
+.av-name{display:flex;align-items:center;gap:10px;}
+.badge{display:inline-block;border-radius:20px;font-size:11px;font-weight:600;padding:2px 10px;}
+.mini-bg{width:50px;height:5px;background:var(--surface2);border-radius:3px;display:inline-block;overflow:hidden;vertical-align:middle;margin-right:6px;}
+.mini-fill{height:100%;border-radius:3px;display:block;}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);}
+.ldot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.loading-screen{min-height:80vh;display:flex;align-items:center;justify-content:center;}
+.spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--text);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13px;color:var(--text2);text-align:center;}
+.empty{text-align:center;padding:2rem;color:var(--text3);font-size:13px;}
+.err-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--rs);padding:12px 16px;font-size:13px;color:var(--red);margin:1rem 2rem;}
+@media(max-width:900px){
+  .g4,.sdr-meta-grid{grid-template-columns:repeat(2,1fr);}
+  .g2,.g21{grid-template-columns:1fr;}
+  .content{padding:1rem;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">Podium Educação — SDRs</span>
+    <span class="period-badge" id="topPeriod">Carregando...</span>
+  </div>
+  <div class="topbar-right">
+    <span class="last-upd" id="lastUpd"></span>
+    <button class="btn-sm active" onclick="setPeriod('month',this)">Este mês</button>
+    <button class="btn-sm" onclick="setPeriod('week',this)">Esta semana</button>
+    <button class="btn-sm" onclick="setPeriod('30days',this)">30 dias</button>
+    <button class="btn-sm" onclick="reloadData()">↻ Atualizar</button>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <button class="tab active" onclick="showTab(this,'geral')">Visão geral</button>
+  <button class="tab" onclick="showTab(this,'metas')">Metas vs. realizado</button>
+  <button class="tab" onclick="showTab(this,'funil')">Funil</button>
+  <button class="tab" onclick="showTab(this,'atividades')">Atividades detalhadas</button>
+  <button class="tab" onclick="showTab(this,'ranking')">Ranking</button>
+</div>
+
+<div id="mainContent">
+  <div class="loading-screen"><div><div class="spinner"></div><div class="loading-text" id="loadingText">Carregando dados...</div></div></div>
+</div>
+
+<script>
+const META_GOAL = 80;
+const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#dc2626','#0891b2','#db2777','#65a30d','#6b7280','#0d9488'];
+let _period = 'month', _charts = {}, _data = null;
+
+function showTab(btn, id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  if (_data) renderTab(id, _data);
+}
+
+function setPeriod(p, btn) {
+  _period = p;
+  document.querySelectorAll('.topbar-right .btn-sm').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadData();
+}
+
+async function reloadData() { loadData(); }
+
+async function loadData() {
+  document.getElementById('loadingText').textContent = 'Buscando atividades...';
+  document.getElementById('mainContent').innerHTML = '<div class="loading-screen"><div><div class="spinner"></div><div class="loading-text" id="loadingText">Carregando...</div></div></div>';
+  try {
+    const res = await fetch(`/api/dashboard?period=${_period}`);
+    if (!res.ok) throw new Error('Erro ' + res.status);
+    _data = await res.json();
+    if (_data.error) throw new Error(_data.error);
+    renderDashboard(_data);
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML = `<div class="err-box">Erro ao carregar dados: ${e.message}</div>`;
+  }
+}
+
+function renderDashboard(d) {
+  document.getElementById('topPeriod').textContent = d.period;
+  document.getElementById('lastUpd').textContent = 'Atualizado às ' + d.updated_at + ' · ' + d.total_activities + ' atividades';
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="content">
+      <div class="tab-panel active" id="tab-geral"></div>
+      <div class="tab-panel" id="tab-metas"></div>
+      <div class="tab-panel" id="tab-funil"></div>
+      <div class="tab-panel" id="tab-atividades"></div>
+      <div class="tab-panel" id="tab-ranking"></div>
+    </div>`;
+
+  Object.values(_charts).forEach(c => c.destroy());
+  _charts = {};
+
+  renderTab('geral', d);
+}
+
+function renderTab(id, d) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-' + id);
+  if (!panel) return;
+  panel.classList.add('active');
+
+  const s = d.summary, sdrs = d.sdrs, f = d.funil, g = d.globalGroup;
+
+  if (id === 'geral') {
+    const totRealiz = g['realizada'] || 0;
+    panel.innerHTML = `
+      <div class="g4">
+        <div class="metric"><div class="mlabel">Realizadas (conta meta)</div><div class="mvalue c-blue">${s.realizadas}</div><div class="msub">${s.pct_meta}% da meta · meta: ${META_GOAL}/SDR</div></div>
+        <div class="metric"><div class="mlabel">Ligações de prospecção</div><div class="mvalue">${s.ligacoes}</div><div class="msub">ligações no período</div></div>
+        <div class="metric"><div class="mlabel">Tentativas WhatsApp</div><div class="mvalue">${s.whatsapp}</div><div class="msub">tentativas via WhatsApp</div></div>
+        <div class="metric"><div class="mlabel">No shows</div><div class="mvalue c-amber">${s.noshow}</div><div class="msub">${totRealiz>0?Math.round((s.noshow/totRealiz)*100):0}% das reuniões</div></div>
+      </div>
+      <div class="g21">
+        <div class="card"><div class="card-title">Realizadas por SDR vs. meta (${META_GOAL})</div><div style="position:relative;width:100%;height:280px;"><canvas id="chartMeta"></canvas></div></div>
+        <div class="card"><div class="card-title">Composição de atividades</div><div class="legend" id="legendPie"></div><div style="position:relative;width:100%;height:210px;"><canvas id="chartPie"></canvas></div></div>
+      </div>`;
+
+    if (_charts.meta) _charts.meta.destroy();
+    _charts.meta = new Chart(document.getElementById('chartMeta'), {
+      type: 'bar',
+      data: {
+        labels: sdrs.map(s => s.name.split(' ')[0]),
+        datasets: [
+          { label: 'Realizadas', data: sdrs.map(s => s.realizadas),
+            backgroundColor: sdrs.map(s => s.realizadas >= META_GOAL ? '#16a34a' : s.realizadas >= 60 ? '#d97706' : '#dc2626'), borderRadius: 4 },
+          { label: 'Meta', data: sdrs.map(() => META_GOAL), type: 'line',
+            borderColor: '#9ca3af', borderDash: [4,4], borderWidth: 1.5, pointRadius: 0, fill: false }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } } }
+    });
+
+    const pieGroups = [
+      { g:'ligacao', label:'Ligações', color:'#2563eb' }, { g:'whatsapp', label:'WhatsApp', color:'#16a34a' },
+      { g:'confirmacao', label:'Confirmações', color:'#0891b2' }, { g:'realizada', label:'Reuniões realizadas', color:'#7c3aed' },
+      { g:'noshow', label:'No shows', color:'#d97706' }, { g:'autoagend', label:'Auto agend.', color:'#6366f1' },
+      { g:'venda', label:'Vendas SDR', color:'#059669' }, { g:'reagendamento', label:'Reagendamentos', color:'#8b5cf6' },
+      { g:'cancelamento', label:'Cancelamentos', color:'#ef4444' },
+    ].map(x => ({ ...x, val: g[x.g] || 0 })).filter(x => x.val > 0).sort((a,b) => b.val - a.val);
+
+    if (_charts.pie) _charts.pie.destroy();
+    if (pieGroups.length > 0) {
+      _charts.pie = new Chart(document.getElementById('chartPie'), {
+        type: 'doughnut',
+        data: { labels: pieGroups.map(x => x.label), datasets: [{ data: pieGroups.map(x => x.val), backgroundColor: pieGroups.map(x => x.color), borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '60%' }
+      });
+      document.getElementById('legendPie').innerHTML = pieGroups.map(x => `<span class="legend-item"><span class="ldot" style="background:${x.color}"></span>${x.label} (${x.val})</span>`).join('');
+    }
+  }
+
+  else if (id === 'metas') {
+    panel.innerHTML = `
+      <div class="g4">
+        <div class="metric"><div class="mlabel">Time — % da meta</div><div class="mvalue c-blue">${s.pct_meta}%</div><div class="msub">${s.realizadas} de ${s.meta_total} realizações</div></div>
+        <div class="metric"><div class="mlabel">Acima da meta</div><div class="mvalue c-green">${s.sdrs_acima}</div><div class="msub">SDRs ≥ ${META_GOAL}</div></div>
+        <div class="metric"><div class="mlabel">Na faixa (60–79)</div><div class="mvalue c-amber">${s.sdrs_faixa}</div><div class="msub">SDRs entre 60 e 79</div></div>
+        <div class="metric"><div class="mlabel">Abaixo da meta</div><div class="mvalue c-red">${s.sdrs_abaixo}</div><div class="msub">SDRs com menos de 60</div></div>
+      </div>
+      <div class="sdr-meta-grid">${sdrs.map((sdr, i) => {
+        const pct = sdr.pct_meta;
+        const cls = pct >= 100 ? 'pok' : pct >= 75 ? 'pwarn' : 'pbad';
+        const fc = pct >= 100 ? '#16a34a' : pct >= 75 ? '#d97706' : '#dc2626';
+        const color = PALETTE[i % PALETTE.length];
+        const initials = sdr.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+        return `<div class="sdr-meta-card">
+          <div class="smc-header"><div class="avatar" style="background:${color}18;color:${color}">${initials}</div>
+            <div><div class="smc-name">${sdr.name}</div><div class="smc-sub">${sdr.realizadas}/${META_GOAL} realizadas</div></div></div>
+          <div class="smc-row"><span class="smc-metric">% da meta</span><span class="smc-val">${pct}%<span class="pct-badge ${cls}">${pct >= 100 ? '✓ Atingiu' : pct + '%'}</span></span></div>
+          <div class="prog-bg"><div class="prog-fill" style="width:${Math.min(pct,100)}%;background:${fc}"></div></div>
+          <div class="prog-labels"><span>0</span><span>Meta: ${META_GOAL}</span></div>
+          <div style="height:10px"></div>
+          <div class="smc-row"><span class="smc-metric">Ligações</span><span class="smc-val">${sdr.ligacoes}</span></div>
+          <div class="smc-row"><span class="smc-metric">WhatsApp</span><span class="smc-val">${sdr.whatsapp}</span></div>
+          <div class="smc-row"><span class="smc-metric">No shows</span><span class="smc-val">${sdr.noshow}</span></div>
+          <div class="smc-row"><span class="smc-metric">Vendas pelo SDR</span><span class="smc-val">${sdr.vendas}</span></div>
+        </div>`;
+      }).join('')}</div>`;
+  }
+
+  else if (id === 'funil') {
+    const funnelDefs = [
+      { g:'ligacao', label:'Ligações de prospecção', role:'SDR', color:'#2563eb' },
+      { g:'ligacao_ccl', label:'Ligações CCL', role:'SDR', color:'#60a5fa' },
+      { g:'whatsapp', label:'Tentativas WhatsApp', role:'SDR', color:'#16a34a' },
+      { g:'confirmacao', label:'Confirmações', role:'SDR', color:'#0891b2' },
+      { g:'autoagend', label:'Auto agendamentos', role:'SDR', color:'#6366f1' },
+      { g:'realizada', label:'Reuniões realizadas 🎯', role:'Closer', color:'#7c3aed' },
+      { g:'reagendamento', label:'Reagendamentos', role:'Ambos', color:'#8b5cf6' },
+      { g:'noshow', label:'No shows', role:'SDR', color:'#d97706' },
+      { g:'cancelamento', label:'Cancelamentos', role:'SDR', color:'#ef4444' },
+      { g:'venda', label:'Vendas pelo SDR 🎯', role:'SDR', color:'#16a34a' },
+      { g:'oportunidade', label:'Oportunidade cash', role:'SDR', color:'#f59e0b' },
+      { g:'fechamento', label:'Follow-up/fechamento', role:'Closer', color:'#ec4899' },
+    ].map(x => ({ ...x, cnt: g[x.g] || 0 })).filter(x => x.cnt > 0);
+    const maxF = Math.max(...funnelDefs.map(x => x.cnt), 1);
+
+    const ag = g['ligacao'] || 0, re = g['realizada'] || 0, ns = g['noshow'] || 0, ca = g['cancelamento'] || 0, vs = g['venda'] || 0;
+    const convRows = [
+      { label:'Ligações → Reunião realizada', num:re, den:ag, color:'#7c3aed' },
+      { label:'Reuniões → No show', num:ns, den:re, color:'#d97706' },
+      { label:'Reuniões → Cancelamento', num:ca, den:re, color:'#ef4444' },
+      { label:'Ligações → Venda SDR', num:vs, den:ag, color:'#16a34a' },
+    ];
+
+    panel.innerHTML = `<div class="g2">
+      <div class="card"><div class="card-title">Volume por tipo de atividade</div>
+        <div class="funnel-wrap">${funnelDefs.map(f => {
+          const w = Math.max(Math.round((f.cnt/maxF)*100), f.cnt > 0 ? 3 : 0);
+          const rc = f.role==='SDR' ? 'fr-sdr' : f.role==='Closer' ? 'fr-closer' : 'fr-ambos';
+          return `<div class="funnel-row"><span class="funnel-role ${rc}">${f.role}</span>
+            <span class="funnel-label">${f.label}</span>
+            <div class="funnel-bar-bg"><div class="funnel-bar" style="width:${w}%;background:${f.color}">${f.cnt}</div></div>
+            <span class="funnel-count">${f.cnt}</span></div>`;
+        }).join('')}</div>
+      </div>
+      <div class="card"><div class="card-title">Taxas de conversão</div>
+        ${convRows.map(r => {
+          const pct = r.den > 0 ? Math.round((r.num/r.den)*100) : 0;
+          return `<div style="margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+              <span style="font-size:13px;color:var(--text2)">${r.label}</span>
+              <span style="font-size:14px;font-weight:600">${pct}% <span style="font-size:11px;color:var(--text3)">(${r.num}/${r.den})</span></span>
+            </div><div class="prog-bg"><div class="prog-fill" style="width:${pct}%;background:${r.color}"></div></div></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  else if (id === 'atividades') {
+    const prospGroups = ['ligacao','ligacao_ccl','whatsapp','confirmacao','autoagend'];
+    const resultGroups = ['realizada','noshow','cancelamento','reagendamento','venda','oportunidade','fechamento'];
+    const gl = { ligacao:'Ligações', ligacao_ccl:'CCL', whatsapp:'WhatsApp', confirmacao:'Confirmações', autoagend:'Auto agend.',
+      realizada:'Realizadas 🎯', noshow:'No show', cancelamento:'Cancelamentos', reagendamento:'Reagend.', venda:'Vendas 🎯', oportunidade:'Oportunidade', fechamento:'Follow-up' };
+
+    function buildTable(groups) {
+      const cols = groups.filter(grp => sdrs.some(s => (s.byGroup[grp] || 0) > 0));
+      if (!cols.length) return '<div class="empty">Sem atividades no período.</div>';
+      return `<div style="overflow-x:auto"><table class="rtable"><thead><tr>
+        <th>SDR</th>${cols.map(grp => `<th class="num" style="font-size:10px">${gl[grp]||grp}</th>`).join('')}<th class="num">Total</th>
+      </tr></thead><tbody>${sdrs.map((sdr, i) => {
+        const tot = cols.reduce((acc, grp) => acc + (sdr.byGroup[grp] || 0), 0);
+        const color = PALETTE[i % PALETTE.length];
+        const initials = sdr.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
+        return `<tr><td><div class="av-name"><div class="avatar" style="background:${color}18;color:${color}">${initials}</div>${sdr.name.split(' ')[0]}</div></td>
+          ${cols.map(grp => `<td class="num">${sdr.byGroup[grp]||'—'}</td>`).join('')}
+          <td class="num"><strong>${tot||'—'}</strong></td></tr>`;
+      }).join('')}</tbody></table></div>`;
+    }
+
+    panel.innerHTML = `<div class="g2">
+      <div class="card"><div class="card-title">Prospecção por SDR</div>${buildTable(prospGroups)}</div>
+      <div class="card"><div class="card-title">Resultados por SDR</div>${buildTable(resultGroups)}</div>
+    </div>`;
+  }
+
+  else if (id === 'ranking') {
+    const maxR = Math.max(...sdrs.map(s => s.realizadas), 1);
+    const pc = ['gold','silver','bronze'];
+    panel.innerHTML = `<div class="card"><div class="card-title">Ranking geral — SDRs</div>
+      <table class="rtable"><thead><tr>
+        <th>#</th><th>SDR</th>
+        <th class="num">Realizadas</th><th class="num">% Meta</th>
+        <th class="num">Ligações</th><th class="num">WhatsApp</th>
+        <th class="num">No show</th><th class="num">Vendas SDR</th>
+      </tr></thead><tbody>${sdrs.length ? sdrs.map((sdr, i) => {
+        const cls = sdr.pct_meta >= 100 ? 'pok' : sdr.pct_meta >= 75 ? 'pwarn' : 'pbad';
+        const color = PALETTE[i % PALETTE.length];
+        const initials = sdr.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
+        return `<tr>
+          <td><span class="pos ${pc[i]||''}">${i+1}</span></td>
+          <td><div class="av-name"><div class="avatar" style="background:${color}18;color:${color}">${initials}</div><span>${sdr.name}</span></div></td>
+          <td class="num"><span class="mini-bg"><span class="mini-fill" style="width:${Math.round((sdr.realizadas/maxR)*100)}%;background:${color}"></span></span>${sdr.realizadas}</td>
+          <td class="num"><span class="badge ${cls}">${sdr.pct_meta}%</span></td>
+          <td class="num">${sdr.ligacoes}</td><td class="num">${sdr.whatsapp}</td>
+          <td class="num">${sdr.noshow}</td><td class="num">${sdr.vendas}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>'}</tbody></table></div>`;
+  }
+}
+
+// Carrega ao iniciar
+loadData();
+</script>
+</body>
+</html>
