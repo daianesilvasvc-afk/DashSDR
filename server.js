@@ -102,15 +102,18 @@ app.get('/api/dashboard', async (req, res) => {
     const mode = req.query.period || 'month';
     const { start, end } = getPeriodDates(mode);
 
-    // Busca usuários e atividades em paralelo
-    const [users, allActs] = await Promise.all([
-      pipedriveGet('/users?limit=100'),
+    // Busca todos os usuários (ativos e inativos)
+    const [usersActive, usersAll, allActs] = await Promise.all([
+      pipedriveGet('/users?limit=500'),
+      pipedriveGet('/users?limit=500&filter_id=0').catch(() => []),
       fetchAllActivities(),
     ]);
 
-    // Mapa id → nome
+    // Mapa id → nome — combina todos os usuários
     const idToName = {};
-    (users || []).forEach(u => { idToName[u.id] = u.name; });
+    [...(usersActive || []), ...(usersAll || [])].forEach(u => {
+      if (u && u.id && u.name) idToName[u.id] = u.name;
+    });
 
     // Filtra por período
     const acts = allActs.filter(a => {
@@ -120,14 +123,26 @@ app.get('/api/dashboard', async (req, res) => {
       return dt >= start && dt <= end;
     });
 
-    // Agrupa por nome
+    // Agrupa por nome — tenta extrair nome de múltiplos campos
     const uMap = {};
     const globalGroup = {};
 
     acts.forEach(a => {
-      const createdById = typeof a.created_by_user_id === 'object' ? a.created_by_user_id?.id : a.created_by_user_id;
-      const userId = typeof a.user_id === 'object' ? a.user_id?.id : a.user_id;
-      const name = idToName[createdById] || idToName[userId] || null;
+      // Tenta extrair id e nome do created_by_user_id
+      let name = null;
+      if (a.created_by_user_id) {
+        const v = a.created_by_user_id;
+        const id = typeof v === 'object' ? v?.id : v;
+        const nameFromObj = typeof v === 'object' ? v?.name : null;
+        name = idToName[id] || nameFromObj;
+      }
+      // Fallback: user_id
+      if (!name && a.user_id) {
+        const v = a.user_id;
+        const id = typeof v === 'object' ? v?.id : v;
+        const nameFromObj = typeof v === 'object' ? v?.name : null;
+        name = idToName[id] || nameFromObj;
+      }
       if (!name) return;
 
       if (!uMap[name]) uMap[name] = {
@@ -226,4 +241,44 @@ app.get('/api/dashboard', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Dashboard Podium rodando na porta ${PORT}`);
+});
+
+// Endpoint de debug — mostra usuários e campos de atividades
+app.get('/api/debug', async (req, res) => {
+  try {
+    const [users, acts] = await Promise.all([
+      pipedriveGet('/users?limit=500'),
+      pipedriveGet('/activities?done=1&limit=20&start=0'),
+    ]);
+    const userMap = {};
+    (users||[]).forEach(u => { userMap[u.id] = u.name; });
+
+    // Conta atividades por created_by_user_id
+    const allActs2 = await pipedriveGet('/activities?done=0&limit=500&start=0');
+    const allActs1 = await pipedriveGet('/activities?done=1&limit=500&start=0');
+    const all = [...(allActs1||[]), ...(allActs2||[])];
+    const byCreator = {};
+    all.forEach(a => {
+      const v = a.created_by_user_id;
+      const id = typeof v === 'object' ? v?.id : v;
+      const nameFromObj = typeof v === 'object' ? v?.name : null;
+      const name = userMap[id] || nameFromObj || '— (id: '+id+')';
+      byCreator[name] = (byCreator[name] || 0) + 1;
+    });
+
+    res.json({
+      total_users: (users||[]).length,
+      users: (users||[]).map(u => ({ id: u.id, name: u.name, active: u.active_flag })),
+      total_acts_sample: all.length,
+      by_creator: byCreator,
+      sample_act_fields: (acts||[]).slice(0,3).map(a => ({
+        subject: a.subject,
+        type: a.type,
+        user_id: a.user_id,
+        created_by_user_id: a.created_by_user_id,
+      }))
+    });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
 });
